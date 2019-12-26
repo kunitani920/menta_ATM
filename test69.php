@@ -7,6 +7,8 @@
 実際にATMに必要な機能をリストアップして、ご自由に開発してみてください！
 */
 //ver2.人認証（ログイン）機能追加。2つのclassをrequireして実装
+//ver3.ユーザー数追加。ユーザー毎に、name/money（残高）を持たせる
+//入出金結果をmoneyに反映する、残高履歴管理はデータベースを絡めた方が良さそうなので、やめた
 
 const MENU_SHOW = '【1】残高照会 【2】入金 【3】出金 【9】終了';
 const MONEY_SHOW = '残高照会';
@@ -27,6 +29,11 @@ const WITHDRAW_MAX = 500000;
 const ESCAPE = 'q';
 //ログインエラー許容回数
 const ERROR_LOGIN = 3;
+//ユーザー数
+const USER_MAX = 2;
+//class User
+const NAME = 'name';
+const MONEY = 'money';
 
 //基本メニュー
 function atm() {
@@ -202,36 +209,54 @@ function atmEnd() {
 }
 
 //スタート
-//ユーザーの設定
+//ユーザーの設定、残高追加
 require 'test69_user.php';
 $tanaka = new User();
 $tanaka->setId('123') ;
-$tanaka->setName('田中') ;
 $tanaka->setPass('pass') ;
-$user = $tanaka->getUser();
+$tanaka->setName('田中') ;
+$tanaka->setMoney('500000') ;
+//$userを二次元配列にして、getUserの値を格納する
+$user = array();
+$user[1] = $tanaka->getUser();
+//ユーザーの設定２
+$hara = new User();
+$hara->setId('456') ;
+$hara->setPass('word') ;
+$hara->setName('原') ;
+$hara->setMoney('1000000') ;
+$user[2] = $hara->getUser();
 //ログイン
 $error_login_count = 0;
 require 'test69_atm.php';
 $atm = new Atm();
+
 for($i = 0; $i < ERROR_LOGIN; $i++) {
     $atm->setId();
     $atm->setPass();
-    $login = $atm->collation($user);
-    if($login) {
+    for($j = 1; $j <= USER_MAX; $j++) {
+        $login[$j] = $atm->collation($user[$j]);
+        if($login[$j]) {
+            break;
+        }
+    }
+    if($login[$j]) {
         break;
     }
     echo 'ユーザーIDかパスワードが違います。' . PHP_EOL;
     $error_login_count++;
 }
+
 //ログイン、規定回数失敗
 if($error_login_count === ERROR_LOGIN) {
     echo '端末をロックしました。今日は利用出来ません。' . PHP_EOL;
     exit();
 }
-//ログイン成功
-echo '青空銀行へようこそ！ご希望のメニュー番号を入力してください。' . PHP_EOL;
+
+//ログイン成功。$login[$j]がユーザー情報
+echo $user[$j][NAME] . '様、青空銀行へようこそ！ご希望のメニュー番号を入力してください。' . PHP_EOL;
 //初期金額設定
-$money = 800000;
+$money = $user[$j][MONEY];
 $error_money_count = 1;
 atm();
 
