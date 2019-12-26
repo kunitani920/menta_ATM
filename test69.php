@@ -6,8 +6,7 @@
 ・残額、入金、引き出しの機能を実装
 実際にATMに必要な機能をリストアップして、ご自由に開発してみてください！
 */
-//人認証しない
-//預かり上限額、出金上限額を設定した
+//ver2.人認証（ログイン）機能追加。2つのclassをrequireして実装
 
 const MENU_SHOW = '【1】残高照会 【2】入金 【3】出金 【9】終了';
 const MONEY_SHOW = '残高照会';
@@ -26,6 +25,8 @@ const MONEY_MAX = 10000000;
 const WITHDRAW_MAX = 500000;
 //Escキー
 const ESCAPE = 'q';
+//ログインエラー許容回数
+const ERROR_LOGIN = 3;
 
 //基本メニュー
 function atm() {
@@ -61,11 +62,11 @@ function atm() {
 //入力
 function input($type) {
     //入金・出金で5回エラーの度、ESCAPEキーの提示
-    global $error_count;
-    if($error_count % 6 === 0) {
+    global $error_money_count;
+    if($error_money_count % 6 === 0) {
         echo '〜ヘルプ！〜【' . ESCAPE . '】キーでメニューに戻ります。' . PHP_EOL;
         //エラーカウント、リセット
-        $error_count = 1;
+        $error_money_count = 1;
     }
 
     $input = trim(fgets(STDIN));
@@ -86,8 +87,8 @@ function input($type) {
     if($type === 'deposit') {
         $check = checkDeposit($input);
         if(!$check) {
-            global $error_count;
-            $error_count++;
+            global $error_money_count;
+            $error_money_count++;
             echo '入金額を入力してください。' . PHP_EOL;
             return input('deposit');
         }
@@ -96,8 +97,8 @@ function input($type) {
     if($type === 'withdraw') {
         $check = checkWithdraw($input);
         if(!$check) {
-            global $error_count;
-            $error_count++;
+            global $error_money_count;
+            $error_money_count++;
             echo '出金額を入力してください。' . PHP_EOL;
             return input('withdraw');
         }
@@ -116,23 +117,6 @@ function checkMenu($input) {
 
 //入金チェック
 function checkDeposit($input) {
-    /* 機能しなかったバリデーションチェック
-    if(is_numeric(!$input)) {   
-        echo 'エラー（numeric）！金額を入力してください。' . PHP_EOL;
-        return false;
-    }
-
-    ●「$input」が、stringで来るので、「is_numeric」機能せず
-    ●「checkDeposit(int $input)」にすれば良いのでは？
-    数字以外を入力した時、
-    「Fatal error: Uncaught TypeError: Argument 1 passed to checkDeposit() must be of the type integer, string given,」
-    でエラー終了してしまうので、ダメ。
-    ●「数字＋数字以外」を通してしまう ex:「12en」は「12」と認識される
-    マイナスや、限度額を超える場合はエラーに出来るので、良しとした
-
-    上記内容は、checkWithdraw($input)も同様なので、省略
-    */
-
     if($input <= 0) {
         //空白もここでエラーになる
         echo 'エラー！金額を入力してください。' . PHP_EOL;
@@ -217,11 +201,38 @@ function atmEnd() {
     exit();
 }
 
-
 //スタート
+//ユーザーの設定
+require 'test69_user.php';
+$tanaka = new User();
+$tanaka->setId('123') ;
+$tanaka->setName('田中') ;
+$tanaka->setPass('pass') ;
+$user = $tanaka->getUser();
+//ログイン
+$error_login_count = 0;
+require 'test69_atm.php';
+$atm = new Atm();
+for($i = 0; $i < ERROR_LOGIN; $i++) {
+    $atm->setId();
+    $atm->setPass();
+    $login = $atm->collation($user);
+    if($login) {
+        break;
+    }
+    echo 'ユーザーIDかパスワードが違います。' . PHP_EOL;
+    $error_login_count++;
+}
+//ログイン、規定回数失敗
+if($error_login_count === ERROR_LOGIN) {
+    echo '端末をロックしました。今日は利用出来ません。' . PHP_EOL;
+    exit();
+}
+//ログイン成功
 echo '青空銀行へようこそ！ご希望のメニュー番号を入力してください。' . PHP_EOL;
 //初期金額設定
 $money = 800000;
-$error_count = 1;
+$error_money_count = 1;
 atm();
+
 ?>
