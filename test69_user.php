@@ -1,35 +1,24 @@
 <?php
 //ver2.本体（ver3）に合わせて、残高追加
-const ID = 'id';
-const PASS = 'pass';
-const NAME = 'name';
-const MONEY = 'money';
-
+//ver3.本体（ver4）に合わせて、クラス内に全て移動。ユーザー情報は初期値でセット。残高をmoney->balanceに変更
 class User {
-    private $user = array();
-    private $id = '';
-    private $pass = '';
-    private $name = '';
-    private $money = '';
-
-    public function setId(string $id) {
-        $this->user[ID] = $id;
-    }
-    
-    public function setPass(string $pass) {
-        $this->user[PASS] = $pass;
-    }
-    
-    public function setName(string $name) {
-        $this->user[NAME] = $name;
-    }
-
-    public function setMoney(string $money) {
-        $this->user[MONEY] = $money;
-    }
+    public $user_list = array(
+        1 => array(
+            "id" => "1",
+            "password" => "pass",
+            "name" => "田中",
+            "balance" => "500000"
+        ),
+        2 => array(
+            "id" => "2",
+            "password" => "word",
+            "name" => "原",
+            "balance" => "1000000"
+        )
+    );
 
     public function getUser() {
-        return $this->user;
+        return $this->user_list;
     }
 }
 
