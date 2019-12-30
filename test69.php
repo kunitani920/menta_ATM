@@ -6,222 +6,278 @@
 ・残額、入金、引き出しの機能を実装
 実際にATMに必要な機能をリストアップして、ご自由に開発してみてください！
 */
-//人認証しない
-//預かり上限額、出金上限額を設定した
+//ver2.人認証（ログイン）機能追加。2つのclassをrequireして実装
+//ver3.ユーザー数追加。ユーザー毎に、name/money（残高）を持たせる
+//ver4.全てクラス化。残高をmoney->balanceに変更
 
-const MENU_SHOW = '【1】残高照会 【2】入金 【3】出金 【9】終了';
-const MONEY_SHOW = '残高照会';
-const MONEY_IN = '入金';
-const MONEY_OUT = '引き出し';
-const END_ATM_KEY = '終了'; 
-const ATM_MENU = array(
-    1 => MONEY_SHOW,
-    2 => MONEY_IN,
-    3 => MONEY_OUT,
-    9 => END_ATM_KEY
-);
-//預かり上限額
-const MONEY_MAX = 10000000;
-//1回の出金限度額（本来は1日の限度額だが、今回はパス）
-const WITHDRAW_MAX = 500000;
-//Escキー
-const ESCAPE = 'q';
-
-//基本メニュー
-function atm() {
-    echo MENU_SHOW . PHP_EOL;
-    $select_menu = input('menu');
+//クラス化
+class Atm {
+    //ATMメニュー
+    const MENU_SHOW = '【1】残高照会 【2】入金 【3】出金 【9】終了';
+    const MONEY_SHOW = '残高照会';
+    const MONEY_IN = '入金';
+    const MONEY_OUT = '引き出し';
+    const END_ATM_KEY = '終了'; 
+    const ATM_MENU = array(
+        1 => MONEY_SHOW,
+        2 => MONEY_IN,
+        3 => MONEY_OUT,
+        9 => END_ATM_KEY
+    );
+    //預かり上限額
+    const MONEY_MAX = 10000000;
+    //1回の出金限度額（本来は1日の限度額だが、今回はパス）
+    const WITHDRAW_MAX = 500000;
+    //Escキー
+    const ESCAPE = 'q';
+    //ログインエラー許容回数
+    const ERROR_LOGIN = 3;
+    //ユーザー数
+    const USER_MAX = 2;
     
-    //不正入力
-    if(!$select_menu) {
-        return atm();
+    public $user; //ログイン成功ユーザー
+    public $visitor; //利用客入力内容
+    public $error_money_count = 1;  //入出金エラーカウント変数
+
+    public function __construct()
+    {
+        echo '青空銀行へようこそ。' . PHP_EOL;
+        //ユーザー選択｜成功なら$userに情報が入りmainスタート、失敗なら終了
+        $this->login();
+        echo $this->user['name'] . '様、青空銀行へようこそ！ご希望のメニュー番号を入力してください。' . PHP_EOL;
     }
 
-    //【1】残高照会
-    if(ATM_MENU[$select_menu] === MONEY_SHOW) {
-        return atmShow();
+    public function login()
+        {
+        //class User情報取得
+        require 'test69_user.php';
+        $user_instance = new User();
+        $user_list = $user_instance->getUser();
+        //エラーカウント、初期値セット
+        $error_login_count = 0;
+        //ログインエラー許容回数分、トライ可能
+        for($i = 0; $i < self::ERROR_LOGIN; $i++) {
+            $this->setId();
+            $this->setPassword();
+            //登録ユーザー数分、ID/PASS照合
+            for($j = 1; $j <= self::USER_MAX; $j++) {
+                $login[$j] = $this->collation($user_list[$j]);
+                if($login[$j]) {
+                    break;
+                }
+            }
+            if($login[$j]) {
+                break;
+            }
+            echo 'ユーザーIDかパスワードが違います。' . PHP_EOL;
+            $error_login_count++;
+        }
+        
+        //ログイン、規定回数失敗
+        if($error_login_count === self::ERROR_LOGIN) {
+            echo '端末をロックしました。今日は利用出来ません。' . PHP_EOL;
+            exit();
+        }
+        //ログイン成功者のID番号を返す
+        $this->user = $user_list[$j];
+        return;
     }
 
-    //【2】入金
-    if(ATM_MENU[$select_menu] === MONEY_IN) {
-        return atmDeposit();
+    public function setId()
+    {
+        echo 'ユーザーIDを入力してください。' . PHP_EOL;
+        $this->visitor['id'] = trim(fgets(STDIN));
     }
 
-    //【3】出金
-    if(ATM_MENU[$select_menu] === MONEY_OUT) {
-        return atmWithdraw();
+    public function setPassword() 
+    {
+        echo 'パスワードを入力してください。' . PHP_EOL;
+        $this->visitor['password'] = trim(fgets(STDIN));
     }
 
-    //【9】終了
-    if(ATM_MENU[$select_menu] === END_ATM_KEY) {
-        return atmEnd();
+    public function collation($login_try)
+    {
+        if($this->visitor['id'] === $login_try['id'] && $this->visitor['password'] === $login_try['password']) {
+            return true;
+        }
+        return false;
     }
-}
+    //------------ログイン処理、ココまで--------------
+    //基本メニュー
+    public function main()
+    {
+        echo self::MENU_SHOW . PHP_EOL;
+        $select_menu = $this->input('menu');
+        
+        //【1】残高照会
+        //self::ATM_MENU[$select_menu] = MONEY_SHOW
+        //self::MONEY_SHOW = 残高照会
+        //なので、右辺には「self::」をつけない
+        //以下のメニューも同様
+        if (self::ATM_MENU[$select_menu] === MONEY_SHOW) {
+            return $this->atmShow();
+        }
 
-//入力
-function input($type) {
-    //入金・出金で5回エラーの度、ESCAPEキーの提示
-    global $error_count;
-    if($error_count % 6 === 0) {
-        echo '〜ヘルプ！〜【' . ESCAPE . '】キーでメニューに戻ります。' . PHP_EOL;
-        //エラーカウント、リセット
-        $error_count = 1;
-    }
+        //【2】入金
+        if (self::ATM_MENU[$select_menu] === MONEY_IN) {
+            return $this->atmDeposit();
+        }
 
-    $input = trim(fgets(STDIN));
+        //【3】出金
+        if (self::ATM_MENU[$select_menu] === MONEY_OUT) {
+            return $this->atmWithdraw();
+        }
 
-    if($input === ESCAPE) {
-        return atm();
-    }
-
-    if($type === 'menu') {
-        $check = checkMenu($input);
-        if(!$check) {
-            echo 'エラー！ご希望のメニュー番号を入力してください。' . PHP_EOL;
-            echo MENU_SHOW . PHP_EOL;
-            return input('menu');
+        //【9】終了
+        if (self::ATM_MENU[$select_menu] === END_ATM_KEY) {
+            return $this->atmEnd();
         }
     }
 
-    if($type === 'deposit') {
-        $check = checkDeposit($input);
-        if(!$check) {
-            global $error_count;
-            $error_count++;
-            echo '入金額を入力してください。' . PHP_EOL;
-            return input('deposit');
+    //入力
+    public function input($type)
+    {
+        if ($this->error_money_count % 6 === 0) {
+            echo '〜ヘルプ！〜【' . self::ESCAPE . '】キーでメニューに戻ります。' . PHP_EOL;
+            //エラーカウント、リセット
+            $this->error_money_count = 1;
         }
+
+        $input = trim(fgets(STDIN));
+
+        if ($input === self::ESCAPE) {
+            return $this->main();
+        }
+
+        if ($type === 'menu') {
+            $check = $this->checkMenu($input);
+            if (!$check) {
+                echo 'エラー！ご希望のメニュー番号を入力してください。' . PHP_EOL;
+                echo self::MENU_SHOW . PHP_EOL;
+                return $this->input('menu');
+            }
+        }
+        
+        if ($type === 'deposit') {
+            $check = $this->checkDeposit($input);
+            if (!$check) {
+                $this->error_money_count++;
+                echo '入金額を入力してください。' . PHP_EOL;
+                return $this->input('deposit');
+            }
+        }
+        
+        if ($type === 'withdraw') {
+            $check = $this->checkWithdraw($input);
+            if (!$check) {
+                $this->error_money_count++;
+                echo '出金額を入力してください。' . PHP_EOL;
+                return $this->input('withdraw');
+            }
+        }
+
+        return $input;
     }
 
-    if($type === 'withdraw') {
-        $check = checkWithdraw($input);
-        if(!$check) {
-            global $error_count;
-            $error_count++;
-            echo '出金額を入力してください。' . PHP_EOL;
-            return input('withdraw');
+    //選択メニューチェック
+    public function checkMenu($input)
+    {
+        if (self::ATM_MENU[$input]) {
+            return true;
         }
+        return false;
     }
 
-    return $input;
-}
+    //入金チェック
+    public function checkDeposit($input)
+    {
+        if ($input <= 0) {
+            //空白もここでエラーになる
+            echo 'エラー！金額を入力してください。' . PHP_EOL;
+            return false;
+        }
 
-//選択メニューチェック
-function checkMenu($input) {
-    if(ATM_MENU[$input]) {
+        if (self::MONEY_MAX < ($input + $this->user['balance'])) {
+            echo 'エラー！10,000,000円までしかお預かり出来ません。' . PHP_EOL;
+            echo '残高｜¥ ';
+            echo number_format($this->user['balance']) . PHP_EOL;
+            echo '入金可能額｜¥ ';
+            echo number_format(self::MONEY_MAX - $this->user['balance']) . PHP_EOL;
+            return false;
+        }
+
         return true;
     }
-    return false;
-}
 
-//入金チェック
-function checkDeposit($input) {
-    /* 機能しなかったバリデーションチェック
-    if(is_numeric(!$input)) {   
-        echo 'エラー（numeric）！金額を入力してください。' . PHP_EOL;
-        return false;
-    }
-
-    ●「$input」が、stringで来るので、「is_numeric」機能せず
-    ●「checkDeposit(int $input)」にすれば良いのでは？
-    数字以外を入力した時、
-    「Fatal error: Uncaught TypeError: Argument 1 passed to checkDeposit() must be of the type integer, string given,」
-    でエラー終了してしまうので、ダメ。
-    ●「数字＋数字以外」を通してしまう ex:「12en」は「12」と認識される
-    マイナスや、限度額を超える場合はエラーに出来るので、良しとした
-
-    上記内容は、checkWithdraw($input)も同様なので、省略
-    */
-
-    if($input <= 0) {
+    //出金チェック
+    public function checkWithdraw($input)
+    {
         //空白もここでエラーになる
-        echo 'エラー！金額を入力してください。' . PHP_EOL;
-        return false;
-    }
-
-    global $money;
-    if(MONEY_MAX < ($input + $money)) {
-        echo 'エラー！10,000,000円までしかお預かり出来ません。' . PHP_EOL;
-        echo '残高｜¥ ';
-        echo number_format($money) . PHP_EOL;
-        echo '入金可能額｜¥ ';
-        echo number_format(MONEY_MAX - $money) . PHP_EOL;
-        return false;
-    }
-
-    return true;
-}
-
-//出金チェック
-function checkWithdraw($input) {
-    //空白もここでエラーになる
-    if($input <= 0) {
-        echo 'エラー！金額を入力してください。' . PHP_EOL;
-        return false;
-    }
+        if ($input <= 0) {
+            echo 'エラー！金額を入力してください。' . PHP_EOL;
+            return false;
+        }
     
-    global $money;
-    if(($money - $input) < 0) {
-        echo 'エラー！残高を超えています。' . PHP_EOL;
-        echo '残高｜¥ ';
-        echo number_format($money) . PHP_EOL;
-        return false;
+        if (($this->user['balance'] - $input) < 0) {
+            echo 'エラー！残高を超えています。' . PHP_EOL;
+            echo '残高｜¥ ';
+            echo number_format($this->user['balance']) . PHP_EOL;
+            return false;
+        }
+
+        if (self::WITHDRAW_MAX < $input) {
+            echo 'エラー！出金限度額（50万）を超えています。' . PHP_EOL;
+            return false;
+        }
+
+        return true;
     }
 
-    if(WITHDRAW_MAX < $input) {
-        echo 'エラー！出金限度額（50万）を超えています。' . PHP_EOL;
-        return false;
+    //残高照会
+    public function atmShow()
+    {
+        echo date('Y-m-d | 残高 |¥ ');
+        echo number_format($this->user['balance']) .PHP_EOL;
+        return $this->main();
     }
 
-    return true;
-}
+    //入金
+    public function atmDeposit()
+    {
+        if ($this->user['balance'] === self::MONEY_MAX) {
+            echo 'これ以上お預かり出来ません：お預かり限度額（1,000万）' . PHP_EOL;
+            return $this->main();
+        }
 
-//残高照会
-function atmShow() {
-    global $money;
-    echo date('Y-m-d | 残高 |¥ ');
-    echo number_format($money) .PHP_EOL;
-    return atm();
-}
-
-//入金
-function atmDeposit() {
-    global $money;
-    if($money === MONEY_MAX) {
-        echo 'これ以上お預かり出来ません：お預かり限度額（1,000万）' . PHP_EOL;
-        return atm();
+        echo '入金額を入力してください。' . PHP_EOL;
+        $deposit_money = $this->input('deposit');
+        $this->user['balance'] += $deposit_money;
+        echo number_format($deposit_money);
+        echo '円お預かりしました。' . PHP_EOL;
+        return $this->main();
     }
 
-    echo '入金額を入力してください。' . PHP_EOL;
-    $deposit_money = input('deposit');
-    $money += $deposit_money;
-    echo number_format($deposit_money);
-    echo '円お預かりしました。' . PHP_EOL;
-    return atm();
+    //出金
+    public function atmWithdraw()
+    {
+        echo '出金額を入力してください。' . PHP_EOL;
+        $withdraw_money = $this->input('withdraw');
+        $this->user['balance'] -= $withdraw_money;
+        echo number_format($withdraw_money);
+        echo '円です。取り忘れにご注意ください。' . PHP_EOL;
+        return $this->main();
+    }
+
+    //終了
+    public function atmEnd()
+    {
+        echo 'ご利用、ありがとうございました。' . PHP_EOL;
+        exit();
+    }
 }
 
-//出金
-function atmWithdraw() {
-    echo '出金額を入力してください。' . PHP_EOL;
-    $withdraw_money = input('withdraw');
-    global $money;
-    $money -= $withdraw_money;
-    echo number_format($withdraw_money);
-    echo '円です。取り忘れにご注意ください。' . PHP_EOL;
-    return atm();
-}
-
-//終了
-function atmEnd() {
-    echo 'ご利用、ありがとうございました。' . PHP_EOL;
-    exit();
-}
+$atm = new Atm();
+$atm->main();
 
 
-//スタート
-echo '青空銀行へようこそ！ご希望のメニュー番号を入力してください。' . PHP_EOL;
-//初期金額設定
-$money = 800000;
-$error_count = 1;
-atm();
 ?>
