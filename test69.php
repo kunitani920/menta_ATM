@@ -9,8 +9,9 @@
 //ver2.人認証（ログイン）機能追加。2つのclassをrequireして実装
 //ver3.ユーザー数追加。ユーザー毎に、name/money（残高）を持たせる
 //ver4.全てクラス化。残高をmoney->balanceに変更
+//ver5.requireをTOPへ。ログイン方法変更。ESCキー表示までのエラー回数を定数へ。
+require 'test69_user.php';
 
-//クラス化
 class Atm {
     //ATMメニュー
     const MENU_SHOW = '【1】残高照会 【2】入金 【3】出金 【9】終了';
@@ -30,6 +31,8 @@ class Atm {
     const WITHDRAW_MAX = 500000;
     //Escキー
     const ESCAPE = 'q';
+    //Escキー表示までのエラー回数(+1)
+    const ERROR_INPUT = 6;
     //ログインエラー許容回数
     const ERROR_LOGIN = 3;
     //ユーザー数
@@ -47,61 +50,43 @@ class Atm {
         echo $this->user['name'] . '様、青空銀行へようこそ！ご希望のメニュー番号を入力してください。' . PHP_EOL;
     }
 
-    public function login()
-        {
-        //class User情報取得
-        require 'test69_user.php';
-        $user_instance = new User();
-        $user_list = $user_instance->getUser();
-        //エラーカウント、初期値セット
-        $error_login_count = 0;
-        //ログインエラー許容回数分、トライ可能
-        for($i = 0; $i < self::ERROR_LOGIN; $i++) {
-            $this->setId();
-            $this->setPassword();
-            //登録ユーザー数分、ID/PASS照合
-            for($j = 1; $j <= self::USER_MAX; $j++) {
-                $login[$j] = $this->collation($user_list[$j]);
-                if($login[$j]) {
-                    break;
-                }
-            }
-            if($login[$j]) {
-                break;
-            }
-            echo 'ユーザーIDかパスワードが違います。' . PHP_EOL;
-            $error_login_count++;
-        }
-        
+    public function login($error_login_count = 0)
+    {       
         //ログイン、規定回数失敗
         if($error_login_count === self::ERROR_LOGIN) {
             echo '端末をロックしました。今日は利用出来ません。' . PHP_EOL;
             exit();
         }
-        //ログイン成功者のID番号を返す
-        $this->user = $user_list[$j];
+
+        //ID入力
+        echo 'ユーザーIDを入力してください。' . PHP_EOL;
+        $id = trim(fgets(STDIN));
+        
+        //ユーザーリストに存在するidかチェック
+        if(!User::checkUserList($id)) {
+            echo 'エラー！入力されたIDは存在しません。' .PHP_EOL;
+            $error_login_count++;
+            return $this->login($error_login_count);
+        }
+
+        //$id でユーザー情報を取得
+        $this->user = User::getUserById($id);
+
+        //パスワード入力
+        echo 'パスワードを入力してください。' . PHP_EOL;
+        $password = trim(fgets(STDIN));
+
+        //パスワードチェック
+        if($this->user['password'] !== $password) {
+            echo 'エラー！パスワードが一致しません。' .PHP_EOL;
+            $error_login_count++;
+            return $this->login($error_login_count);
+        }
+
+        //ログイン成功
         return;
     }
 
-    public function setId()
-    {
-        echo 'ユーザーIDを入力してください。' . PHP_EOL;
-        $this->visitor['id'] = trim(fgets(STDIN));
-    }
-
-    public function setPassword() 
-    {
-        echo 'パスワードを入力してください。' . PHP_EOL;
-        $this->visitor['password'] = trim(fgets(STDIN));
-    }
-
-    public function collation($login_try)
-    {
-        if($this->visitor['id'] === $login_try['id'] && $this->visitor['password'] === $login_try['password']) {
-            return true;
-        }
-        return false;
-    }
     //------------ログイン処理、ココまで--------------
     //基本メニュー
     public function main()
@@ -137,7 +122,7 @@ class Atm {
     //入力
     public function input($type)
     {
-        if ($this->error_money_count % 6 === 0) {
+        if ($this->error_money_count % self::ERROR_INPUT === 0) {
             echo '〜ヘルプ！〜【' . self::ESCAPE . '】キーでメニューに戻ります。' . PHP_EOL;
             //エラーカウント、リセット
             $this->error_money_count = 1;
