@@ -10,6 +10,7 @@
 //ver3.ユーザー数追加。ユーザー毎に、name/money（残高）を持たせる
 //ver4.全てクラス化。残高をmoney->balanceに変更
 //ver5.requireをTOPへ。ログイン方法変更。ESCキー表示までのエラー回数を定数へ。
+//ver6.ATM_MENUの中と、mainの基本メニューの定数に、self::を付加。menu,deposit,withdraw,balanceを定数化。inputのif文をswitch文へ。
 require 'test69_user.php';
 
 class Atm {
@@ -20,11 +21,17 @@ class Atm {
     const MONEY_OUT = '引き出し';
     const END_ATM_KEY = '終了'; 
     const ATM_MENU = array(
-        1 => MONEY_SHOW,
-        2 => MONEY_IN,
-        3 => MONEY_OUT,
-        9 => END_ATM_KEY
+        1 => self::MONEY_SHOW,
+        2 => self::MONEY_IN,
+        3 => self::MONEY_OUT,
+        9 => self::END_ATM_KEY
     );
+    
+    const MENU = 'menu';
+    const DEPOSIT = 'deposit';
+    const WITHDRAW = 'withdraw';
+    const BALANCE = 'balance';
+
     //預かり上限額
     const MONEY_MAX = 10000000;
     //1回の出金限度額（本来は1日の限度額だが、今回はパス）
@@ -92,29 +99,24 @@ class Atm {
     public function main()
     {
         echo self::MENU_SHOW . PHP_EOL;
-        $select_menu = $this->input('menu');
-        
-        //【1】残高照会
-        //self::ATM_MENU[$select_menu] = MONEY_SHOW
-        //self::MONEY_SHOW = 残高照会
-        //なので、右辺には「self::」をつけない
-        //以下のメニューも同様
-        if (self::ATM_MENU[$select_menu] === MONEY_SHOW) {
+        $select_menu = $this->input(self::MENU);
+
+        if (self::ATM_MENU[$select_menu] === self::MONEY_SHOW) {
             return $this->atmShow();
         }
 
         //【2】入金
-        if (self::ATM_MENU[$select_menu] === MONEY_IN) {
+        if (self::ATM_MENU[$select_menu] === self::MONEY_IN) {
             return $this->atmDeposit();
         }
 
         //【3】出金
-        if (self::ATM_MENU[$select_menu] === MONEY_OUT) {
+        if (self::ATM_MENU[$select_menu] === self::MONEY_OUT) {
             return $this->atmWithdraw();
         }
 
         //【9】終了
-        if (self::ATM_MENU[$select_menu] === END_ATM_KEY) {
+        if (self::ATM_MENU[$select_menu] === self::END_ATM_KEY) {
             return $this->atmEnd();
         }
     }
@@ -127,38 +129,40 @@ class Atm {
             //エラーカウント、リセット
             $this->error_money_count = 1;
         }
-
+        
         $input = trim(fgets(STDIN));
-
+        
         if ($input === self::ESCAPE) {
             return $this->main();
         }
+        
+        switch($type) {
+            case self::MENU :
+                $check = $this->checkMenu($input);
+                if (!$check) {
+                    echo 'エラー！ご希望のメニュー番号を入力してください。' . PHP_EOL;
+                    echo self::MENU_SHOW . PHP_EOL;
+                    return $this->input(self::MENU);
+                }
+            break;
 
-        if ($type === 'menu') {
-            $check = $this->checkMenu($input);
-            if (!$check) {
-                echo 'エラー！ご希望のメニュー番号を入力してください。' . PHP_EOL;
-                echo self::MENU_SHOW . PHP_EOL;
-                return $this->input('menu');
-            }
-        }
-        
-        if ($type === 'deposit') {
-            $check = $this->checkDeposit($input);
-            if (!$check) {
-                $this->error_money_count++;
-                echo '入金額を入力してください。' . PHP_EOL;
-                return $this->input('deposit');
-            }
-        }
-        
-        if ($type === 'withdraw') {
-            $check = $this->checkWithdraw($input);
-            if (!$check) {
-                $this->error_money_count++;
-                echo '出金額を入力してください。' . PHP_EOL;
-                return $this->input('withdraw');
-            }
+            case self::DEPOSIT :
+                $check = $this->checkDeposit($input);
+                if (!$check) {
+                    $this->error_money_count++;
+                    echo '入金額を入力してください。' . PHP_EOL;
+                    return $this->input(self::DEPOSIT);
+                }
+            break;
+
+            case self::WITHDRAW :
+                $check = $this->checkWithdraw($input);
+                if (!$check) {
+                    $this->error_money_count++;
+                    echo '出金額を入力してください。' . PHP_EOL;
+                    return $this->input(self::WITHDRAW);
+                }
+            break;
         }
 
         return $input;
@@ -182,12 +186,12 @@ class Atm {
             return false;
         }
 
-        if (self::MONEY_MAX < ($input + $this->user['balance'])) {
+        if (self::MONEY_MAX < ($input + $this->user[self::BALANCE])) {
             echo 'エラー！10,000,000円までしかお預かり出来ません。' . PHP_EOL;
             echo '残高｜¥ ';
-            echo number_format($this->user['balance']) . PHP_EOL;
+            echo number_format($this->user[self::BALANCE]) . PHP_EOL;
             echo '入金可能額｜¥ ';
-            echo number_format(self::MONEY_MAX - $this->user['balance']) . PHP_EOL;
+            echo number_format(self::MONEY_MAX - $this->user[self::BALANCE]) . PHP_EOL;
             return false;
         }
 
@@ -203,10 +207,10 @@ class Atm {
             return false;
         }
     
-        if (($this->user['balance'] - $input) < 0) {
+        if (($this->user[self::BALANCE] - $input) < 0) {
             echo 'エラー！残高を超えています。' . PHP_EOL;
             echo '残高｜¥ ';
-            echo number_format($this->user['balance']) . PHP_EOL;
+            echo number_format($this->user[self::BALANCE]) . PHP_EOL;
             return false;
         }
 
@@ -222,21 +226,21 @@ class Atm {
     public function atmShow()
     {
         echo date('Y-m-d | 残高 |¥ ');
-        echo number_format($this->user['balance']) .PHP_EOL;
+        echo number_format($this->user[self::BALANCE]) .PHP_EOL;
         return $this->main();
     }
 
     //入金
     public function atmDeposit()
     {
-        if ($this->user['balance'] === self::MONEY_MAX) {
+        if ($this->user[self::BALANCE] === self::MONEY_MAX) {
             echo 'これ以上お預かり出来ません：お預かり限度額（1,000万）' . PHP_EOL;
             return $this->main();
         }
 
         echo '入金額を入力してください。' . PHP_EOL;
-        $deposit_money = $this->input('deposit');
-        $this->user['balance'] += $deposit_money;
+        $deposit_money = $this->input(self::DEPOSIT);
+        $this->user[self::BALANCE] += $deposit_money;
         echo number_format($deposit_money);
         echo '円お預かりしました。' . PHP_EOL;
         return $this->main();
@@ -246,8 +250,8 @@ class Atm {
     public function atmWithdraw()
     {
         echo '出金額を入力してください。' . PHP_EOL;
-        $withdraw_money = $this->input('withdraw');
-        $this->user['balance'] -= $withdraw_money;
+        $withdraw_money = $this->input(self::WITHDRAW);
+        $this->user[self::BALANCE] -= $withdraw_money;
         echo number_format($withdraw_money);
         echo '円です。取り忘れにご注意ください。' . PHP_EOL;
         return $this->main();
