@@ -12,6 +12,10 @@
 //ver5.requireをTOPへ。ログイン方法変更。ESCキー表示までのエラー回数を定数へ。
 //ver6.ATM_MENUの中と、mainの基本メニューの定数に、self::を付加。menu,deposit,withdraw,balanceを定数化。inputのif文をswitch文へ。
 //ver7.ログインエラー回数をプロパティ管理。ログイン入力をinputメソッドにまとめ。入力値を半角数字に自動変更。バリデーションチェックを別のクラス化。
+//ver8.バリデーションチェックを、前回作成したクラスに集約＆staticからインスタンスに呼び出し方法変更。
+//ログイン方法と、ESCAPEキーの処理について、致命的エラー発見。$login変数で、ログイン管理して解決。
+//ID入力エラー→ID入力成功→PASS入力成功→PASS入力に戻る（User情報リセットにより、何を入力してもエラー）
+
 require 'test69_user.php';
 require 'validation/MenuValidation.php';
 require 'validation/MoneyValidation.php';
@@ -51,6 +55,7 @@ class Atm {
     const USER_MAX = 2;
     
     public $user; //ログイン成功ユーザー
+    public $login = 0; //ログイン状態 0,未 1,済
     public $error_login_count = 0;  //ログインエラーカウント変数
     public $error_money_count = 1;  //入出金エラーカウント変数
 
@@ -74,6 +79,11 @@ class Atm {
         echo 'ユーザーIDを入力してください。' . PHP_EOL;
         $id = $this->input('id');
         
+        //ログイン済なら終了
+        if($this->login === 1) {
+            return;
+        }
+
         //$id でユーザー情報を取得
         $this->user = User::getUserById($id);
 
@@ -82,6 +92,7 @@ class Atm {
         $password = $this->input('password');
 
         //ログイン成功
+        $this->login = 1;
         return;
     }
 
@@ -124,31 +135,32 @@ class Atm {
         $input = trim(fgets(STDIN));
         $input = mb_convert_kana($input, 'n');   //全角数字→半角数字へ
         
-        if ($input === self::ESCAPE) {
+        if ($this->login === 1 && $input === self::ESCAPE) {  //ログインしる場合のみ発動
             return $this->main();
         }
         
         switch($type) {
             case 'id' :
-                $check = IdValidation::check($input);
+                $validation = new IdValidation;
+                $check = $validation->check($input);
                 if(!$check) {
-                    echo 'エラー！IDは数字です。' .PHP_EOL;
-                    $this->error_login_count++;
-                    return $this->login();
-                }
-
-                //ユーザーリストに存在するidかチェック
-                if(!User::checkUserList($input)) {
-                    echo 'エラー！入力されたIDは存在しません。' .PHP_EOL;
+                    $error_messages = $validation->getErrorMessages();
+                    foreach($error_messages as $error_message) {
+                        echo $error_message . PHP_EOL;
+                    }
                     $this->error_login_count++;
                     return $this->login();
                 }
             break;
 
             case 'password' :
-                $check = PasswordValidation::check($input);
+                $validation = new PasswordValidation;
+                $check = $validation->check($input);
                 if(!$check) {
-                    echo 'エラー！入力が確認出来ませんでした。' .PHP_EOL;
+                    $error_messages = $validation->getErrorMessages();
+                    foreach($error_messages as $error_message) {
+                        echo $error_message . PHP_EOL;
+                    }
                     $this->error_login_count++;
                     return $this->login();
                 }
@@ -162,19 +174,26 @@ class Atm {
             break;
 
             case self::MENU :
-                $check = MenuValidation::check($input);
+                $validation = new MenuValidation;
+                $check = $validation->check($input);
                 if (!$check) {
-                    echo 'エラー！ご希望のメニュー番号を入力してください。' . PHP_EOL;
-                    echo self::MENU_SHOW . PHP_EOL;
-                    return $this->input(self::MENU);
+                    $error_messages = $validation->getErrorMessages();
+                    foreach($error_messages as $error_message) {
+                        echo $error_message . PHP_EOL;
+                    } 
+                    return $this->main();
                 }
             break;
 
             case self::DEPOSIT :
-                $check = MoneyValidation::check($input);
+                $validation = new MoneyValidation;
+                $check = $validation->check($input);
                 if (!$check) {
+                    $error_messages = $validation->getErrorMessages();
+                    foreach($error_messages as $error_message) {
+                        echo $error_message . PHP_EOL;
+                    }
                     $this->error_money_count++;
-                    echo 'エラー！入金額を入力してください。' . PHP_EOL;
                     return $this->input(self::DEPOSIT);
                 }
                 
@@ -190,10 +209,14 @@ class Atm {
             break;
             
             case self::WITHDRAW :
-                $check = MoneyValidation::check($input);
+                $validation = new MoneyValidation;
+                $check = $validation->check($input);
                 if (!$check) {
+                    $error_messages = $validation->getErrorMessages();
+                    foreach($error_messages as $error_message) {
+                        echo $error_message . PHP_EOL;
+                    }
                     $this->error_money_count++;
-                    echo 'エラー！出金額を入力してください。' . PHP_EOL;
                     return $this->input(self::WITHDRAW);
                 }
                 
