@@ -1,7 +1,8 @@
 <?php
+//ver2.BaseValidationを継承。
+require_once 'BaseValidation.php';
 
-class IdValidation {
-    private $error_messages = array();
+class IdValidation extends BaseValidation {
     public function check($input) {
         if($input === '') {
             $msg = 'エラー！入力が確認出来ませんでした。';
@@ -25,15 +26,6 @@ class IdValidation {
         }
 
         return true;
-    }
-
-    public function addErrorMessage($msg) {
-        $this->error_messages[] = $msg;
-        return;
-    }
-
-    public function getErrorMessages() {
-        return $this->error_messages;
     }
 }
 

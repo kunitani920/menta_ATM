@@ -14,13 +14,14 @@
 //ver7.ログインエラー回数をプロパティ管理。ログイン入力をinputメソッドにまとめ。入力値を半角数字に自動変更。バリデーションチェックを別のクラス化。
 //ver8.バリデーションチェックを、前回作成したクラスに集約＆staticからインスタンスに呼び出し方法変更。
 //ログイン方法と、ESCAPEキーの処理について、致命的エラー発見。$login変数で、ログイン管理して解決。
-//ID入力エラー→ID入力成功→PASS入力成功→PASS入力に戻る（User情報リセットにより、何を入力してもエラー）
+//ver9.エラーメッセージ表示、ログイン状態切替をメソッド化。ログイン状態、定数化。終了前、ログアウトを追加。requireをrequire_onceへ。
+//カプセル化で、mainと__construct以外、private化。
 
-require 'test69_user.php';
-require 'validation/MenuValidation.php';
-require 'validation/MoneyValidation.php';
-require 'validation/IdValidation.php';
-require 'validation/PasswordValidation.php';
+require_once 'test69_user.php';
+require_once 'validation/MenuValidation.php';
+require_once 'validation/MoneyValidation.php';
+require_once 'validation/IdValidation.php';
+require_once 'validation/PasswordValidation.php';
 
 class Atm {
     //ATMメニュー
@@ -49,15 +50,18 @@ class Atm {
     const ESCAPE = 'q';
     //Escキー表示までのエラー回数(+1)
     const ERROR_INPUT = 6;
+    //ログイン状態
+    const LOGIN_STATUS_TRUE = 1;
+    const LOGIN_STATUS_FALSE = 0;
     //ログインエラー許容回数
     const ERROR_LOGIN = 3;
     //ユーザー数
     const USER_MAX = 2;
     
-    public $user; //ログイン成功ユーザー
-    public $login = 0; //ログイン状態 0,未 1,済
-    public $error_login_count = 0;  //ログインエラーカウント変数
-    public $error_money_count = 1;  //入出金エラーカウント変数
+    private $user; //ログイン成功ユーザー
+    private $login = self::LOGIN_STATUS_FALSE; //ログイン状態初期値
+    private $error_login_count = 0;  //ログインエラーカウント変数
+    private $error_money_count = 1;  //入出金エラーカウント変数
 
     public function __construct()
     {
@@ -67,7 +71,7 @@ class Atm {
         echo $this->user['name'] . '様、青空銀行へようこそ！ご希望のメニュー番号を入力してください。' . PHP_EOL;
     }
 
-    public function login()
+    private function login()
     {       
         //ログイン、規定回数失敗
         if($this->error_login_count === self::ERROR_LOGIN) {
@@ -80,7 +84,7 @@ class Atm {
         $id = $this->input('id');
         
         //ログイン済なら終了
-        if($this->login === 1) {
+        if($this->isLogin()) {
             return;
         }
 
@@ -92,8 +96,16 @@ class Atm {
         $password = $this->input('password');
 
         //ログイン成功
-        $this->login = 1;
+        $this->login = self::LOGIN_STATUS_TRUE;
         return;
+    }
+
+    //ログイン状態管理
+    private function isLogin() {
+        if($this->login === self::LOGIN_STATUS_TRUE) {
+            return true;
+        }
+        return false;
     }
 
     //------------ログイン処理、ココまで--------------
@@ -124,7 +136,7 @@ class Atm {
     }
 
     //入力
-    public function input($type)
+    private function input($type)
     {
         if ($this->error_money_count % self::ERROR_INPUT === 0) {
             echo '〜ヘルプ！〜【' . self::ESCAPE . '】キーでメニューに戻ります。' . PHP_EOL;
@@ -135,7 +147,7 @@ class Atm {
         $input = trim(fgets(STDIN));
         $input = mb_convert_kana($input, 'n');   //全角数字→半角数字へ
         
-        if ($this->login === 1 && $input === self::ESCAPE) {  //ログインしる場合のみ発動
+        if ($this->login === self::LOGIN_STATUS_TRUE && $input === self::ESCAPE) {  //ログインしる場合のみ発動
             return $this->main();
         }
         
@@ -145,9 +157,7 @@ class Atm {
                 $check = $validation->check($input);
                 if(!$check) {
                     $error_messages = $validation->getErrorMessages();
-                    foreach($error_messages as $error_message) {
-                        echo $error_message . PHP_EOL;
-                    }
+                    $this->showErrorMessages($error_messages);
                     $this->error_login_count++;
                     return $this->login();
                 }
@@ -158,9 +168,7 @@ class Atm {
                 $check = $validation->check($input);
                 if(!$check) {
                     $error_messages = $validation->getErrorMessages();
-                    foreach($error_messages as $error_message) {
-                        echo $error_message . PHP_EOL;
-                    }
+                    $this->showErrorMessages($error_messages);
                     $this->error_login_count++;
                     return $this->login();
                 }
@@ -178,9 +186,7 @@ class Atm {
                 $check = $validation->check($input);
                 if (!$check) {
                     $error_messages = $validation->getErrorMessages();
-                    foreach($error_messages as $error_message) {
-                        echo $error_message . PHP_EOL;
-                    } 
+                    $this->showErrorMessages($error_messages);
                     return $this->main();
                 }
             break;
@@ -190,9 +196,7 @@ class Atm {
                 $check = $validation->check($input);
                 if (!$check) {
                     $error_messages = $validation->getErrorMessages();
-                    foreach($error_messages as $error_message) {
-                        echo $error_message . PHP_EOL;
-                    }
+                    $this->showErrorMessages($error_messages);
                     $this->error_money_count++;
                     return $this->input(self::DEPOSIT);
                 }
@@ -213,9 +217,7 @@ class Atm {
                 $check = $validation->check($input);
                 if (!$check) {
                     $error_messages = $validation->getErrorMessages();
-                    foreach($error_messages as $error_message) {
-                        echo $error_message . PHP_EOL;
-                    }
+                    $this->showErrorMessages($error_messages);
                     $this->error_money_count++;
                     return $this->input(self::WITHDRAW);
                 }
@@ -239,8 +241,15 @@ class Atm {
         return $input;
     }
 
+    //エラーメッセージ表示
+    private function showErrorMessages($error_messages) {
+        foreach($error_messages as $error_message) {
+            echo $error_message . PHP_EOL;
+        }
+    }
+
     //残高照会
-    public function atmShow()
+    private function atmShow()
     {
         echo date('Y-m-d | 残高 |¥ ');
         echo number_format($this->user[self::BALANCE]) .PHP_EOL;
@@ -248,7 +257,7 @@ class Atm {
     }
 
     //入金
-    public function atmDeposit()
+    private function atmDeposit()
     {
         if ($this->user[self::BALANCE] === self::MONEY_MAX) {
             echo 'これ以上お預かり出来ません：お預かり限度額（1,000万）' . PHP_EOL;
@@ -264,7 +273,7 @@ class Atm {
     }
 
     //出金
-    public function atmWithdraw()
+    private function atmWithdraw()
     {
         echo '出金額を入力してください。' . PHP_EOL;
         $withdraw_money = $this->input(self::WITHDRAW);
@@ -275,9 +284,10 @@ class Atm {
     }
 
     //終了
-    public function atmEnd()
+    private function atmEnd()
     {
         echo 'ご利用、ありがとうございました。' . PHP_EOL;
+        $this->login = self::LOGIN_STATUS_FALSE;
         exit();
     }
 }
