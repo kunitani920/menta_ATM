@@ -17,7 +17,7 @@
 //ver9.エラーメッセージ表示、ログイン状態切替をメソッド化。ログイン状態、定数化。終了前、ログアウトを追加。requireをrequire_onceへ。
 //カプセル化で、mainと__construct以外、private化。
 
-require_once 'test69_user.php';
+require_once 'Atm_user.php';
 require_once 'validation/MenuValidation.php';
 require_once 'validation/MoneyValidation.php';
 require_once 'validation/IdValidation.php';
