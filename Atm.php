@@ -147,7 +147,7 @@ class Atm {
         $input = trim(fgets(STDIN));
         $input = mb_convert_kana($input, 'n');   //全角数字→半角数字へ
         
-        if ($this->login === self::LOGIN_STATUS_TRUE && $input === self::ESCAPE) {  //ログインしる場合のみ発動
+        if ($this->login === self::LOGIN_STATUS_TRUE && $input === self::ESCAPE) {  //ログイン中のみ発動
             return $this->main();
         }
         
